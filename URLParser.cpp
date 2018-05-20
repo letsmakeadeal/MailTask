@@ -13,10 +13,8 @@ void URLParser::Parse(const std::string& url) {
 
   host_ =
       std::string(url.begin() + pos_of_prot_end, url.begin() + pos_of_host_end);
-  std::cout << "Here" << std::endl;
 
   if (url.begin() + pos_of_host_end != url.end()) {
-    std::cout << "IN LONG PATH :" << std::endl;
     path_ = std::string(url.begin() + pos_of_host_end, url.end());
   } else
     path_ = '/';

@@ -2,18 +2,18 @@
 #include <iostream>
 #include <vector>
 void HTTPResponseParser::Parse(const std::string& header) {
-	std::vector<size_t> redirectes;
-	redirectes.push_back(header.find("301 Moved Permanently"));
-	redirectes.push_back(header.find("302 Moved Temporarily"));
+  std::vector<size_t> redirectes;
+  redirectes.push_back(header.find("301 Moved Permanently"));
+  redirectes.push_back(header.find("302 Moved Temporarily"));
 
-	size_t position = std::string::npos;
-	for (size_t i = 0 ;  i < 5 ; ++i ){
-		if ( redirectes[i] != std::string::npos)
-		{
-			position = redirectes[i];
-			break; 
-		}
-	}
+  size_t position = std::string::npos;
+  size_t size = redirectes.size();
+  for (size_t i = 0; i < size; ++i) {
+    if (redirectes[i] != std::string::npos) {
+      position = redirectes[i];
+      break;
+    }
+  }
 
   if (position != std::string::npos) {
     redirected_ = true;
