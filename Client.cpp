@@ -15,26 +15,68 @@
 Client::Client(const std::string &url) { url_parser_.Parse(url); }
 
 bool Client::Connect() {
-  if (url_parser_.GetProtocol() != "http" )
-    throw std::logic_error("Sorry , working only with HTTP protocol");
-
-  sockaddr_in addr;
-  socket_ = socket(AF_INET, SOCK_STREAM, 0);
-
-  if (socket_ < 0) {
-    throw std::runtime_error("Can't create socket");
+  if (url_parser_.GetProtocol() != "http") {
+    std::cerr << "Sorry , working only with HTTP protocol" << std::endl;
+    return false;
   }
 
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(80);
-  hostent *hp = gethostbyname(url_parser_.GetHost().c_str());
+  std::cout << "Protocol = " << url_parser_.GetProtocol()
+            << " ,Host= " << url_parser_.GetHost()
+            << " , Port = " << url_parser_.GetPort()
+            << " ,path=" << url_parser_.GetPath() << std::endl;
 
-  char *value = inet_ntoa(*(struct in_addr *)(hp->h_addr_list[0]));
-  addr.sin_addr.s_addr = inet_addr(value);
+  addrinfo hints, *res;
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
 
-  if (connect(socket_, (sockaddr *)&addr, sizeof(addr)) < 0) {
+  int status;
+  if (status = getaddrinfo(url_parser_.GetHost().c_str(), "http", &hints,
+                           &res) != 0) {
+    std::cerr << "getaddrinfo:" << gai_strerror(status) << std::endl;
+    return false;
+  }
+
+  char ipstr[INET6_ADDRSTRLEN];
+  for (addrinfo *p = res; p != NULL; p = p->ai_next) {
+    void *addr;
+    std::string ipver = "";
+    if (p->ai_family == AF_INET) {
+      struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+      addr = &(ipv4->sin_addr);
+      ipver = "Addres in IPv4 : ";
+    } else {
+      struct sockaddr_in6 *ipv6 = (struct sockaddr_in6 *)p->ai_addr;
+      addr = &(ipv6->sin6_addr);
+      ipver = "Addres in IPv6 :";
+    }
+    inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
+    std::cout << ipver << ipstr << std::endl;
+  }
+
+  socket_ = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if (socket_ < 0) {
+    std::cerr << "Can't create socket" << std::endl;
+    return false;
+  }
+
+  int port = 80;
+  if (url_parser_.GetPort() != "") {
+    std::istringstream str(url_parser_.GetPort());
+    str >> port;
+  }
+
+  if (res->ai_family == AF_INET) {
+    ((struct sockaddr_in *)(res->ai_addr))->sin_port = htons(port);
+  } else {
+    ((struct sockaddr_in6 *)(res->ai_addr))->sin6_port = htons(port);
+  }
+
+  if (connect(socket_, res->ai_addr, res->ai_addrlen) < 0) {
     std::cerr << "Can't connect" << std::endl;
     return false;
+  } else {
+    std::cout << " Connected OK \n" << std::endl;
   }
 
   return true;
@@ -43,7 +85,7 @@ bool Client::Connect() {
 const std::string Client::GenerateHTTPRequest(const std::string &host,
                                               const std::string &path) {
   std::ostringstream str;
-  str << "GET " << path << " HTTP/1.0\r\nHost: " << host << "\r\n\r\n\r\n";
+  str << "GET " << path << " HTTP/1.1\r\nHost: " << host << "\r\n\r\n\r\n";
   return str.str();
 }
 
@@ -59,7 +101,7 @@ const std::string Client::GenerateFileName(const std::string &host,
 void Client::LoadData() {
   std::string http_request =
       GenerateHTTPRequest(url_parser_.GetHost(), url_parser_.GetPath());
-  std::cout << http_request << std::endl;
+  std::cout << "Request send to server : \n" << http_request << std::endl;
 
   send(socket_, http_request.c_str(), http_request.length(), 0);
   char buffer[10000];
@@ -75,7 +117,6 @@ void Client::LoadData() {
       cntr << counter;
       file.close();
       file.open(filename + cntr.str(), std::ios_base::out | std::ios_base::in);
-      std::cout << file.is_open() << std::endl;
       if (!file.is_open()) {
         file.clear();
         file.open(filename + cntr.str(), std::ios_base::out);
@@ -91,30 +132,96 @@ void Client::LoadData() {
 
   int data_length = 1;
   counter = 0;
-
   HTTPResponseParser http_parser;
+  int data_length_not_readed = 0;
+  int content_length = 0;
+
   while (data_length != 0) {
     data_length = recv(socket_, buffer, 10000, 0);
-
+    // std::cout << " Counter = " << counter << " data_length = " << data_length
+    //         << std::endl;
+    std::string buf = buffer;
     if (counter == 0) {
-      std::string buf = buffer;
       size_t it = buf.find("\r\n\r\n");
       if (it != std::string::npos) {
-        std::string HTTPHeader(buf.begin(), buf.begin() + it);
+        std::string HTTPHeader(buf.begin(), buf.begin() + it + 2);
+        std::cout << "Http response header: \n\n" << HTTPHeader << std::endl;
         http_parser.Parse(HTTPHeader);
-      }
-      file << std::string(buf.begin() + it + 4, buf.end());
-    } else
-      file << buffer;
 
+        if (http_parser.Redirected()) break;
+      }
+      //  std::cout << "Buffer = " << buf << std::endl;
+      std::string buff_without_header(buf.begin() + it + 4,
+                                      buf.begin() + data_length);
+      // std::cout << " Sizeof without header = " << buff_without_header.size()
+      //          << "\nHeader\n"
+      //         << buff_without_header << std::endl;
+      if (buff_without_header.size() != 0) {
+        if (!http_parser.IsChunkedEncoding()) {
+          //  std::cout << "NOT in chuncked zone " << std::endl;
+          file << buff_without_header;
+        } else {
+          std::string str = http_parser.ParseIfChuckedBuff(buff_without_header);
+          data_length_not_readed = http_parser.GetChunkSize();
+          if (str == "") break;
+          file << str;
+        }
+      }
+
+      content_length = http_parser.GetContentLength();
+      if (buff_without_header.size() == http_parser.GetContentLength()) break;
+      content_length -= buff_without_header.size();
+
+    } else {
+      buf = std::string(buf.begin(), buf.begin() + data_length);
+      if (http_parser.IsChunkedEncoding()) {
+        if (data_length_not_readed == 0) {
+          std::string str = http_parser.ParseIfChuckedBuff(buf);
+          data_length_not_readed = http_parser.GetChunkSize();
+          if (str == "") break;
+          file << str;
+        } else {
+          if (data_length_not_readed > data_length) {
+            file << buf;
+            data_length_not_readed -= data_length;
+          } else {
+            file << std::string(buf.begin(),
+                                buf.begin() + data_length_not_readed);
+
+            if (std::string(buf.begin() + data_length_not_readed + 2, buf.end())
+                    .size() != 0) {
+              std::string str = http_parser.ParseIfChuckedBuff(std::string(
+                  buf.begin() + data_length_not_readed + 2, buf.end()));
+
+              data_length_not_readed = http_parser.GetChunkSize();
+              if (str == "" && data_length_not_readed == 0) break;
+              file << str;
+            } else
+              data_length_not_readed = 0;
+          }
+        }
+
+      } else {
+        content_length -= buf.size();
+        file << buf;
+        if (content_length == 0) break;
+      }
+    }
     ++counter;
   }
 
   close(socket_);
   if (http_parser.Redirected()) {
+    std::cout << "\nRedirected URL : " << http_parser.GetRedirectedURL() << "\n"
+              << std::endl;
     file.close();
     std::remove(filename.c_str());
-    url_parser_.Parse(http_parser.GetRedirectedURL());
+
+    if (http_parser.OnlyPathRedirected())
+       url_parser_.SetPath(http_parser.GetRedirectedURL());
+     else
+       url_parser_.Parse(http_parser.GetRedirectedURL());
+
     Connect();
     LoadData();
   }
