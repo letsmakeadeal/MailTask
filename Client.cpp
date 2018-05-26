@@ -138,8 +138,6 @@ void Client::LoadData() {
 
   while (data_length != 0) {
     data_length = recv(socket_, buffer, 10000, 0);
-    // std::cout << " Counter = " << counter << " data_length = " << data_length
-    //         << std::endl;
     std::string buf = buffer;
     if (counter == 0) {
       size_t it = buf.find("\r\n\r\n");
@@ -150,15 +148,10 @@ void Client::LoadData() {
 
         if (http_parser.Redirected()) break;
       }
-      //  std::cout << "Buffer = " << buf << std::endl;
       std::string buff_without_header(buf.begin() + it + 4,
                                       buf.begin() + data_length);
-      // std::cout << " Sizeof without header = " << buff_without_header.size()
-      //          << "\nHeader\n"
-      //         << buff_without_header << std::endl;
       if (buff_without_header.size() != 0) {
         if (!http_parser.IsChunkedEncoding()) {
-          //  std::cout << "NOT in chuncked zone " << std::endl;
           file << buff_without_header;
         } else {
           std::string str = http_parser.ParseIfChuckedBuff(buff_without_header);
