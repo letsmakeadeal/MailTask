@@ -9,7 +9,7 @@ class Client {
   bool Connect();
   void LoadData();
 
- public:
+ private:
   const std::string GenerateHTTPRequest(const std::string& host,
                                         const std::string& path);
   const std::string GenerateFileName(const std::string& host,
