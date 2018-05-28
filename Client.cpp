@@ -38,6 +38,7 @@ bool Client::Connect() {
   }
 
   char ipstr[INET6_ADDRSTRLEN];
+  memset(ipstr , 0 , sizeof(char) * INET6_ADDRSTRLEN );
   for (addrinfo *p = res; p != NULL; p = p->ai_next) {
     void *addr;
     std::string ipver = "";
