@@ -8,7 +8,8 @@ class URLParser {
   const std::string& GetHost();
   const std::string& GetPath();
   const std::string& GetPort();
-  void SetPath(const std::string& path); //For the case if just path changed in redirection
+  void SetPath(const std::string&
+                   path);  // For the case if just path changed in redirection
  private:
   std::string host_;
   std::string protocol_;

@@ -14,6 +14,7 @@ class HTTPResponseParser {
   std::string ParseIfChuckedBuff(const std::string& buff);
   int GetContentLength();
   bool OnlyPathRedirected();
+
  private:
   bool redirected_;
   std::string redirected_url_;

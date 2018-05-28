@@ -104,7 +104,9 @@ void Client::LoadData() {
   std::cout << "Request send to server : \n" << http_request << std::endl;
 
   send(socket_, http_request.c_str(), http_request.length(), 0);
-  char buffer[10000];
+  const int buffer_size = 10000;
+  char buffer[buffer_size];
+  memset(buffer, 0, sizeof(char) * buffer_size);
   std::string filename =
       GenerateFileName(url_parser_.GetHost(), url_parser_.GetPath());
   std::fstream file;
@@ -147,7 +149,9 @@ void Client::LoadData() {
         http_parser.Parse(HTTPHeader);
 
         if (http_parser.Redirected()) break;
-      }
+      } else
+        throw std::runtime_error("Invalid HTTP response header");
+
       std::string buff_without_header(buf.begin() + it + 4,
                                       buf.begin() + data_length);
       if (buff_without_header.size() != 0) {
@@ -211,9 +215,9 @@ void Client::LoadData() {
     std::remove(filename.c_str());
 
     if (http_parser.OnlyPathRedirected())
-       url_parser_.SetPath(http_parser.GetRedirectedURL());
-     else
-       url_parser_.Parse(http_parser.GetRedirectedURL());
+      url_parser_.SetPath(http_parser.GetRedirectedURL());
+    else
+      url_parser_.Parse(http_parser.GetRedirectedURL());
 
     Connect();
     LoadData();

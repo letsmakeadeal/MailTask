@@ -1,8 +1,10 @@
 #include "HTTPResponseParser.h"
 #include <algorithm>
+#include <exception>
 #include <iostream>
 #include <sstream>
 #include <vector>
+
 void HTTPResponseParser::Parse(const std::string& header) {
   std::vector<size_t> redirectes;
   redirectes.push_back(header.find("301 Moved Permanently"));
@@ -28,13 +30,13 @@ void HTTPResponseParser::Parse(const std::string& header) {
         std::string(header.begin() + pos + location.size(),
                     header.begin() + header.find("\r\n", pos));
 
-    redirected_url_ = std::string(
-        str_with_ws.begin(),
-        std::remove(str_with_ws.begin(), str_with_ws.end(), ' '));
+    redirected_url_ =
+        std::string(str_with_ws.begin(),
+                    std::remove(str_with_ws.begin(), str_with_ws.end(), ' '));
 
-    if (redirected_url_[0] == '/'){
-        redirected_only_path_ = true;
-      }
+    if (redirected_url_[0] == '/') {
+      redirected_only_path_ = true;
+    }
 
   } else {
     redirected_ = false;
@@ -51,6 +53,7 @@ void HTTPResponseParser::Parse(const std::string& header) {
           std::remove(str_with_ws.begin(), str_with_ws.end(), ' '));
 
       if (str_without_ws == "chunked") chunked_ = true;
+      return;
     }
 
     std::string key_length = "Content-Length:";
@@ -67,7 +70,9 @@ void HTTPResponseParser::Parse(const std::string& header) {
 
       std::istringstream str_val(str_without_ws);
       str_val >> content_length_;
-    }
+    } else
+      throw std::runtime_error(
+          "Not chunked transfer and doesn't have field \"Content Length\" ");
   }
 }
 bool HTTPResponseParser::Redirected() { return redirected_; }
@@ -76,7 +81,7 @@ const std::string& HTTPResponseParser::GetRedirectedURL() {
   return redirected_url_;
 }
 
-bool HTTPResponseParser::OnlyPathRedirected(){ return redirected_only_path_;}
+bool HTTPResponseParser::OnlyPathRedirected() { return redirected_only_path_; }
 
 int HTTPResponseParser::GetContentLength() { return content_length_; }
 

@@ -97,7 +97,7 @@ void URLParser::Parse(const std::string& url) {
         std::string(url.begin() + pos_of_port_end, url.begin() + end_of_path);
   }
 }
-void URLParser::SetPath(const std::string& path){ path_ = path;};
+void URLParser::SetPath(const std::string& path) { path_ = path; };
 const std::string& URLParser::GetProtocol() { return protocol_; }
 const std::string& URLParser::GetHost() { return host_; }
 const std::string& URLParser::GetPath() { return path_; }
