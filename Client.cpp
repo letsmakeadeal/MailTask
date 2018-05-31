@@ -139,8 +139,10 @@ void Client::LoadData() {
   int data_length_not_readed = 0;
   int content_length = 0;
 
-  while (data_length != 0) {
+  while ( 1 ) {
     data_length = recv(socket_, buffer, 10000, 0);
+    if (data_length == 0 )
+      break;
     std::string buf = std::string(buffer, buffer + data_length);
     if (counter == 0) {
       size_t it = buf.find("\r\n\r\n");
