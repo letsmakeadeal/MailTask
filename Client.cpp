@@ -141,7 +141,7 @@ void Client::LoadData() {
 
   while (data_length != 0) {
     data_length = recv(socket_, buffer, 10000, 0);
-    std::string buf = buffer;
+    std::string buf = std::string(buffer, buffer + data_length);
     if (counter == 0) {
       size_t it = buf.find("\r\n\r\n");
       if (it != std::string::npos) {
